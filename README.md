@@ -157,12 +157,15 @@ container replacement.
   public. This deployment pulls anonymously, so no GHCR token or PAT needs to be
   added. See the
   [GitHub Container registry documentation](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry).
-- The container publishes port `3030` by default. Configure the server's
-  firewall or reverse proxy for the selected host port. An existing container
-  with a different name must be stopped or migrated before the first deployment
-  if it occupies that port. The script manages only the selected container name
-  and does not inherit custom volumes, networks, or environment variables from
-  an existing container.
+- The container publishes to `127.0.0.1:3030` by default, so the host port is
+  accessible only from the server. For public access, configure a reverse proxy
+  running on the host to forward to `http://127.0.0.1:3030` (or the configured
+  host port), including WebSocket support. A reverse proxy in another container
+  needs a shared Docker network instead of its own loopback address. An existing
+  container with a different name must be stopped or migrated before the first
+  deployment if it occupies that port. The script manages only the selected
+  container name and does not inherit custom volumes, networks, or environment
+  variables from an existing container.
 
 #### GitHub secrets and variables
 
@@ -186,11 +189,11 @@ actual SSH port in the scan; nonstandard ports use `[host]:port` entries.
 
 Optionally add these **Environment variables** (not secrets) in `production`:
 
-| Variable           | Default        | Meaning                        |
-| ------------------ | -------------- | ------------------------------ |
-| `DEPLOY_SSH_PORT`  | `22`           | Server SSH port.               |
-| `DEPLOY_PORT`      | `3030`         | Host port mapped to port 3030. |
-| `DEPLOY_CONTAINER` | `letsmarkdown` | Managed Docker container name. |
+| Variable           | Default        | Meaning                                 |
+| ------------------ | -------------- | --------------------------------------- |
+| `DEPLOY_SSH_PORT`  | `22`           | Server SSH port.                        |
+| `DEPLOY_PORT`      | `3030`         | Loopback host port mapped to port 3030. |
+| `DEPLOY_CONTAINER` | `letsmarkdown` | Managed Docker container name.          |
 
 After setup, push to `main` to deploy. To retry a failed deployment, rerun the
 failed job in Actions. On success, the old container is removed; old images are

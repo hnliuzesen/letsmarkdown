@@ -52,7 +52,7 @@ fi
 replacement_attempted=true
 docker run -d --name "$container" \
   --restart unless-stopped \
-  --publish "$port:3030" \
+  --publish "127.0.0.1:$port:3030" \
   --env PORT=3030 \
   "$image"
 
@@ -79,4 +79,4 @@ trap - EXIT
 if $old_saved; then
   docker rm "$backup"
 fi
-echo "Deployed $image as $container on port $port."
+echo "Deployed $image as $container at 127.0.0.1:$port."
