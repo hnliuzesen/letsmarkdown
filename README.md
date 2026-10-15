@@ -123,6 +123,81 @@ docker run --rm -dp 3030:3030 cveinnt/letsmarkdown
 I deploy a public instance of this image with
 [DigitalOcean App Platform](https://www.digitalocean.com/products/app-platform/).
 
+### Automatic deployment from GHCR
+
+For this repository, each push to `main` builds and publishes
+`ghcr.io/<owner>/<repository>:latest` for linux/amd64 and linux/arm64. Once the
+build and formatting checks pass and the image is published, the
+`Deploy production` job connects to your server over SSH and replaces its Docker
+container. Pull requests never deploy or access production secrets.
+
+The deployment pulls the commit tag published alongside `latest`, so it runs the
+exact image that passed this workflow even if `latest` changes later. It pulls
+before stopping the old container, checks `/api/stats` after startup, and
+restores the previous container if startup fails. Deployments are serialized,
+and newer pushes do not cancel an active replacement.
+
+**Deployment restarts disconnect WebSocket clients and clear documents held in
+server memory. Restoring a container restores its image and configuration, not
+its previous in-memory documents.** There is a short interruption during
+container replacement.
+
+#### Server and registry setup
+
+- The server must be reachable from GitHub-hosted runners over SSH and have
+  Bash, Docker, and curl installed. The SSH user must be able to run
+  `docker info` without an interactive privilege prompt.
+- Add the deployment SSH public key to that user's `~/.ssh/authorized_keys`. Use
+  a dedicated key without a passphrase for automation. Generate one on a trusted
+  machine with `ssh-keygen -t ed25519 -f ./letsmarkdown-deploy -N ''`; install
+  `letsmarkdown-deploy.pub` on the server and use the private key as the secret
+  below. Keep the private key outside this repository.
+- In the GHCR package settings, change the package visibility to **Public**. A
+  public source repository does not automatically make a newly published package
+  public. This deployment pulls anonymously, so no GHCR token or PAT needs to be
+  added. See the
+  [GitHub Container registry documentation](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry).
+- The container publishes port `3030` by default. Configure the server's
+  firewall or reverse proxy for the selected host port. An existing container
+  with a different name must be stopped or migrated before the first deployment
+  if it occupies that port. The script manages only the selected container name
+  and does not inherit custom volumes, networks, or environment variables from
+  an existing container.
+
+#### GitHub secrets and variables
+
+Create an environment named `production` under repository **Settings →
+Environments** and restrict its deployment branches to `main`. Add these
+**Environment secrets**:
+
+| Secret               | Value                                                             |
+| -------------------- | ----------------------------------------------------------------- |
+| `DEPLOY_HOST`        | Server IP address or hostname, without `ssh://` or a port.        |
+| `DEPLOY_USER`        | SSH login username that can run Docker.                           |
+| `DEPLOY_SSH_KEY`     | Complete private key, including its header, footer, and newlines. |
+| `DEPLOY_KNOWN_HOSTS` | Verified SSH host key entries in OpenSSH `known_hosts` format.    |
+
+Obtain the host key entries from a trusted machine with
+`ssh-keyscan -H -p 22 YOUR_SERVER`. Verify their fingerprints against the
+server's host keys through a trusted connection before saving the output. For
+example, view the server's Ed25519 fingerprint with
+`ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub` on the server. Use your
+actual SSH port in the scan; nonstandard ports use `[host]:port` entries.
+
+Optionally add these **Environment variables** (not secrets) in `production`:
+
+| Variable           | Default        | Meaning                        |
+| ------------------ | -------------- | ------------------------------ |
+| `DEPLOY_SSH_PORT`  | `22`           | Server SSH port.               |
+| `DEPLOY_PORT`      | `3030`         | Host port mapped to port 3030. |
+| `DEPLOY_CONTAINER` | `letsmarkdown` | Managed Docker container name. |
+
+After setup, push to `main` to deploy. To retry a failed deployment, rerun the
+failed job in Actions. On success, the old container is removed; old images are
+retained and unrelated containers and images are not pruned. If a deployment is
+forcibly terminated and leaves `<container>-previous`, inspect and recover that
+container before retrying; the script refuses to overwrite it.
+
 ## Contributing
 
 This project is still in a **very early** phase. If you're interested in adding
