@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "test:wasm": "node scripts/test-wasm.mjs",
     "serve": "vite preview",
     "concurrent": "concurrently \"cargo run\" \"npm run dev\"",
     "format": "prettier --write ."

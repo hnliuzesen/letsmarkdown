@@ -25,6 +25,7 @@ COPY package.json package-lock.json ./
 COPY --from=wasm /home/rust/src/letsmarkdown-wasm/pkg letsmarkdown-wasm/pkg
 RUN npm ci
 COPY . .
+RUN npm run test:wasm
 RUN npm run build
 
 FROM scratch
